@@ -1,5 +1,9 @@
 import logo from "./logo.svg";
 import "./App.css";
+import { configureAbly, useChannel } from "@ably-labs/react-hooks";
+import { nanoid } from "nanoid";
+
+configureAbly({ key: process.env.REACT_APP_ABLY_API_KEY, clientId: nanoid() });
 
 function App() {
   return (

@@ -9,6 +9,8 @@ const {
   MessageChannel,
 } = require("worker_threads");
 
+const { nanoid } = require("nanoid");
+
 const express = require("express");
 const Ably = require("ably");
 const p2 = require("p2");
@@ -26,15 +28,8 @@ const realtime = new Ably.Realtime({
   echoMessages: false,
 });
 
-// create a uniqueId to assign to clients on auth
-const uniqueId = function () {
-  return "id-" + Math.random().toString(36).substr(2, 16);
-};
-
-app.use(express.static("public"));
-
 app.get("/auth", (request, response) => {
-  const tokenParams = { clientId: uniqueId() };
+  const tokenParams = { clientId: nanoid() };
   realtime.auth.createTokenRequest(tokenParams, function (err, tokenRequest) {
     if (err) {
       response
