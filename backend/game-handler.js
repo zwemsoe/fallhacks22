@@ -4,26 +4,18 @@ const Ably = require("ably");
 const ABLY_API_KEY = process.env.ABLY_API_KEY;
 
 const GAME_ROOM_CAPACITY = 3;
-const CANVAS_HEIGHT = 700;
-const CANVAS_WIDTH = 700;
-const SHIP_PLATFORM = CANVAS_HEIGHT - 12;
-const BULLET_PLATFORM = SHIP_PLATFORM - 32;
-const PLAYER_VERTICAL_INCREMENT = 20;
-const PLAYER_VERTICAL_MOVEMENT_UPDATE_INTERVAL = 1000;
-const PLAYER_SCORE_INCREMENT = 5;
-const P2_WORLD_TIME_STEP = 1 / 16;
+const CANVAS_HEIGHT = 70;
+const CANVAS_WIDTH = 70;
 const MIN_PLAYERS_TO_START_GAME = 3;
 const GAME_TICKER_MS = 100;
-const PLAYER_DIRECTION = ['l', 'r', 'u', 'd']
+const PLAYER_DIRECTION = ["l", "r", "u", "d"];
 const MAX_CORD = 70;
-const X_RANGE = [...Array(MAX_CORD).keys()]
-const Y_RANGE = [...Array(MAX_CORD).keys()]
+const X_RANGE = [...Array(MAX_CORD).keys()];
+const Y_RANGE = [...Array(MAX_CORD).keys()];
 
-
-let players = []
+let players = [];
 let playerChannels = {};
 let isOver = false;
-let alivePlayers = 0;
 let gameRoomName = "primary";
 let gameRoom;
 let gameTickerOn = false;
@@ -34,9 +26,9 @@ const realtime = new Ably.Realtime({
   echoMessages: false,
 });
 
-Array.prototype.random = function(){
-  return this[Math.floor(Math.random()*this.length)];
-}
+Array.prototype.random = function () {
+  return this[Math.floor(Math.random() * this.length)];
+};
 // wait until connection with Ably is established
 // Assume that if the number of players goes over MIN_PLAYERS_TO_START_GAME, they cannot publish "enter" presence
 realtime.connection.once("connected", () => {
@@ -46,10 +38,13 @@ realtime.connection.once("connected", () => {
   gameRoom.presence.subscribe("enter", (player) => {
     console.log("new player ", player);
     // I don't know what the player object looks like for now.
-    const {clientId, data:{name}} = player
+    const {
+      clientId,
+      data: { name },
+    } = player;
 
-    if(players.length > MIN_PLAYERS_TO_START_GAME){
-      gameRoom.publish("full-room")
+    if (players.length > MIN_PLAYERS_TO_START_GAME) {
+      gameRoom.publish("full-room");
       return;
     }
 
@@ -59,52 +54,83 @@ realtime.connection.once("connected", () => {
 
     newPlayerObject = {
       id: clientId,
-      cord: locatePlayer(players),
+      cord: locatePlayer(),
       direction: PLAYER_DIRECTION.random(), // "l", "r", "u", "d"
       name,
       isDead: false,
+      isPacman: false,
     };
     players.push(newPlayerObject);
 
     subscribeToPlayerInput(playerChannels[clientId], clientId);
-    
+
     if (players.length === MIN_PLAYERS_TO_START_GAME) {
+      const pacman = between(0, players.length);
+      players[pacman].isPacman = true;
       gameTickerOn = true;
-      startGameDataTicker();
+      gameLoop();
     }
   });
 
   // subscribe to players leaving the game
-  gameRoom.presence.subscribe("leave", (player) => {  
-    players = players.filter(p => p.id === player.clientId);
+  gameRoom.presence.subscribe("leave", (player) => {
+    players = players.filter((p) => p.id === player.clientId);
   });
-
 });
 
-function locatePlayer(players){
+function locatePlayer() {
   //could be improved
-  existingXs = players.map((player)=> player.cord.x)
-  existingYs = players.map((player)=> player.cord.y)
-  filteredX = X_RANGE.filter((x)=> existingXs.includes(x))
-  filteredY = Y_RANGE.filter((y)=> existingYs.includes(y))
-  return [filteredX.random(), filteredY.random()]
+  const existingXs = players.map((player) => player.cord.x);
+  const existingYs = players.map((player) => player.cord.y);
+  const filteredX = X_RANGE.filter((x) => existingXs.includes(x));
+  const filteredY = Y_RANGE.filter((y) => existingYs.includes(y));
+  return [filteredX.random(), filteredY.random()];
 }
 
 // start the game tick
-function startGameDataTicker() {
+function gameLoop() {
   let tickInterval = setInterval(() => {
     if (!gameTickerOn) {
       clearInterval(tickInterval);
     } else {
+      let isOver = false;
+      let winner;
+      let size = [CANVAS_WIDTH, CANVAS_HEIGHT];
+      const killed = detectCollisions();
+      const deadPlayers = players.filter((p) => p.isDead);
+
+      if (deadPlayers.length === players.length - 1) {
+        gameTickerOn = false;
+        isOver = true;
+        winner = players[0];
+      }
       // fan out the latest game state
       gameRoom.publish("game-state", {
-        players: players,
-        isOver: isOver,
-        killed: numOfKilled,
-        size: [CANVAS_WIDTH, CANVAS_HEIGHT]
+        size,
+        players,
+        isOver,
+        killed,
+        winner,
       });
     }
   }, GAME_TICKER_MS);
+}
+
+function detectCollisions() {
+  let killed = 0;
+  const pacman = players.findIndex((p) => p.isPacman);
+  players.forEach(({ isPacman, cord }, idx) => {
+    if (!isPacman) {
+      if (
+        players[pacman].cord[0] === cord[0] &&
+        players[pacman].cord[1] === cord[1]
+      ) {
+        players[idx].isDead = true;
+        killed++;
+      }
+    }
+  });
+  return killed;
 }
 
 // subscribe to each player's input events
@@ -133,65 +159,14 @@ function subscribeToPlayerInput(channelInstance, playerId) {
           y -= 1;
         }
     }
-    players = players.map((p) => { if (p.id === playerId) { p.cord = [x, y] } })
+    players = players.map((p) => {
+      if (p.id === playerId) {
+        p.cord = [x, y];
+      }
+    });
   });
-  channelInstance.subscribe("start-game", (msg) => {});
-
-  // subscribe to players being shot
-  channelInstance.subscribe("dead-notif", (msg) => {});
-}
-
-// finish the game
-function finishGame(playerId) {
-  console.log("finished");
-
-  gameRoom.publish("game-over", {
-    winner: winnerName,
-  });
-}
-
-function playerXposition(index) {
-  switch (index) {
-    case 0:
-      return between(22, 246);
-    case 1:
-      return between(247, 474);
-    case 2:
-      return between(475, 702);
-    case 3:
-      return between(703, 930);
-    case 4:
-      return between(931, 1158);
-    case 5:
-      return between(1159, 1378);
-    default:
-      return between(22, 246);
-  }
-}
-
-function playerYposition(index) {
-  switch (index) {
-    case 0:
-      return between(22, 246);
-    case 1:
-      return between(247, 474);
-    case 2:
-      return between(475, 702);
-    case 3:
-      return between(703, 930);
-    case 4:
-      return between(931, 1158);
-    case 5:
-      return between(1159, 1378);
-    default:
-      return between(22, 246);
-  }
 }
 
 function between(min, max) {
   return Math.floor(Math.random() * (max - min) + min);
 }
-
-// generateGame()
-// updatePlayer
-// choosePacman(game)
