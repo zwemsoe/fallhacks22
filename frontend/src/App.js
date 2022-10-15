@@ -1,29 +1,23 @@
-import logo from "./logo.svg";
-import "./App.css";
-import { configureAbly, useChannel } from "@ably-labs/react-hooks";
+import { configureAbly } from "@ably-labs/react-hooks";
 import { nanoid } from "nanoid";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import Home from "./Home";
+import Game from "./Game";
+import { Box, Center } from "@chakra-ui/react";
 
 configureAbly({ key: process.env.REACT_APP_ABLY_API_KEY, clientId: nanoid() });
 
-function App() {
-  return (
-    <div className='App'>
-      <header className='App-header'>
-        <img src={logo} className='App-logo' alt='logo' />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className='App-link'
-          href='https://reactjs.org'
-          target='_blank'
-          rel='noopener noreferrer'
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
-}
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Home />,
+  },
+  {
+    path: "game",
+    element: <Game />,
+  },
+]);
 
-export default App;
+export default function App() {
+  return <RouterProvider router={router} />;
+}

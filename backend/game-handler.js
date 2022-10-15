@@ -164,3 +164,7 @@ function playerYposition(index) {
 function between(min, max) {
   return Math.floor(Math.random() * (max - min) + min);
 }
+
+// generateGame()
+// updatePlayer
+// choosePacman(game)
