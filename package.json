@@ -1,0 +1,21 @@
+{
+  "name": "fallhacks22",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "npm run dev --prefix backend & npm start --prefix frontend",
+    "setup": "npm install --prefix frontend && npm install --prefix backend"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zwemsoe/fallhacks22.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/zwemsoe/fallhacks22/issues"
+  },
+  "homepage": "https://github.com/zwemsoe/fallhacks22#readme"
+}
