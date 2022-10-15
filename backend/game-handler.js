@@ -14,12 +14,16 @@ const PLAYER_SCORE_INCREMENT = 5;
 const P2_WORLD_TIME_STEP = 1 / 16;
 const MIN_PLAYERS_TO_START_GAME = 3;
 const GAME_TICKER_MS = 100;
+const PLAYER_DIRECTION = ['l', 'r', 'u', 'd']
+const MAX_CORD = 70;
+const X_RANGE = [...Array(MAX_CORD).keys()]
+const Y_RANGE = [...Array(MAX_CORD).keys()]
 
-let players = {};
+
+let players = []
 let playerChannels = {};
-let gameOn = false;
+let isOver = false;
 let alivePlayers = 0;
-let totalPlayers = 0;
 let gameRoomName = "primary";
 let gameRoom;
 let gameTickerOn = false;
@@ -30,47 +34,62 @@ const realtime = new Ably.Realtime({
   echoMessages: false,
 });
 
+Array.prototype.random = function(){
+  return this[Math.floor(Math.random()*this.length)];
+}
 // wait until connection with Ably is established
+// Assume that if the number of players goes over MIN_PLAYERS_TO_START_GAME, they cannot publish "enter" presence
 realtime.connection.once("connected", () => {
   gameRoom = realtime.channels.get(gameRoomName);
 
   // subscribe to new players entering the game
   gameRoom.presence.subscribe("enter", (player) => {
-    console.log("new player");
-    let newPlayerId;
-    alivePlayers++;
-    totalPlayers++;
-    newPlayerId = player.clientId;
+    console.log("new player ", player);
+    // I don't know what the player object looks like for now.
+    const {clientId, data:{name}} = player
+
+    if(players.length > MIN_PLAYERS_TO_START_GAME){
+      gameRoom.publish("full-room")
+      return;
+    }
+
     playerChannels[newPlayerId] = realtime.channels.get(
-      "clientChannel-" + player.clientId
+      "clientChannel-" + clientId
     );
-    if (totalPlayers == 1) {
+
+    newPlayerObject = {
+      id: clientId,
+      cord: locatePlayer(),
+      direction: PLAYER_DIRECTION.random(), // "l", "r", "u", "d"
+      name,
+      isPacman: false,
+      isDead: false,
+    };
+    players.push(newPlayerObject);
+
+    subscribeToPlayerInput(playerChannels[clientId], clientId);
+    
+    if (players.length === MIN_PLAYERS_TO_START_GAME) {
       gameTickerOn = true;
       startGameDataTicker();
     }
-    newPlayerObject = {
-      id: newPlayerId,
-      x: playerXposition(colorIndex),
-      y: playerYposition(colorIndex),
-      score: 0,
-      nickname: player.data.nickname,
-      isAlive: true,
-    };
-    players[newPlayerId] = newPlayerObject;
-    subscribeToPlayerInput(playerChannels[newPlayerId], newPlayerId);
   });
 
   // subscribe to players leaving the game
-  gameRoom.presence.subscribe("leave", (player) => {
-    let leavingPlayer = player.clientId;
-    alivePlayers--;
-    totalPlayers--;
-    delete players[leavingPlayer];
+  gameRoom.presence.subscribe("leave", (player) => {  
+    players = players.filter(p => p.id === player.clientId);
   });
-  gameRoom.publish("thread-ready", {
-    start: true,
-  });
+
 });
+
+function locatePlayer(){
+  //could be improved
+  const existingXs = players.map((player)=> player.cord.x)
+  const existingYs = players.map((player)=> player.cord.y)
+  const filteredX = X_RANGE.filter((x)=> existingXs.includes(x))
+  const filteredY = Y_RANGE.filter((y)=> existingYs.includes(y))
+  return [filteredX.random(), filteredY.random()]
+}
 
 // start the game tick
 function startGameDataTicker() {
@@ -80,12 +99,10 @@ function startGameDataTicker() {
     } else {
       // fan out the latest game state
       gameRoom.publish("game-state", {
-        // players: players,
-        // playerCount: totalPlayers,
-        // shipBody: copyOfShipBody.position,
-        // bulletOrBlank: bulletOrBlank,
-        // gameOn: gameOn,
-        // killerBullet: killerBulletId,
+        players: players,
+        isOver: isOver,
+        killed: numOfKilled,
+        size: [CANVAS_WIDTH, CANVAS_HEIGHT]
       });
     }
   }, GAME_TICKER_MS);
@@ -94,19 +111,30 @@ function startGameDataTicker() {
 // subscribe to each player's input events
 function subscribeToPlayerInput(channelInstance, playerId) {
   channelInstance.subscribe("pos", (msg) => {
-    if (msg.data.keyPressed == "left") {
-      if (players[playerId].x - 20 < 20) {
-        players[playerId].x = 25;
-      } else {
-        players[playerId].x -= 20;
-      }
-    } else if (msg.data.keyPressed == "right") {
-      if (players[playerId].x + 20 > 1380) {
-        players[playerId].x = 1375;
-      } else {
-        players[playerId].x += 20;
-      }
+    let [
+      {
+        cord: [x, y],
+      },
+    ] = players.filter((p) => p.id != playerId);
+    switch (msg.data.keyPressed) {
+      case "l":
+        if (x !== 0) {
+          x -= 1;
+        }
+      case "r":
+        if (x !== MAX_CORD) {
+          x += 1;
+        }
+      case "u":
+        if (y !== MAX_CORD) {
+          y += 1;
+        }
+      case "d":
+        if (y !== 0) {
+          y -= 1;
+        }
     }
+    players = players.map((p) => { if (p.id === playerId) { p.cord = [x, y] } })
   });
   channelInstance.subscribe("start-game", (msg) => {});
 
