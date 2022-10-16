@@ -38,17 +38,16 @@ realtime.connection.once("connected", () => {
   gameRoom.presence.subscribe("enter", (player) => {
     console.log("new player ", player);
     // I don't know what the player object looks like for now.
-    const {
-      clientId,
-      data: { name },
-    } = player;
+    const { clientId, data } = player;
+
+    const name = data?.name || "";
 
     if (players.length > MIN_PLAYERS_TO_START_GAME) {
       gameRoom.publish("full-room");
       return;
     }
 
-    playerChannels[newPlayerId] = realtime.channels.get(
+    playerChannels[clientId] = realtime.channels.get(
       "clientChannel-" + clientId
     );
 

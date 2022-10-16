@@ -12,17 +12,23 @@ import {
 import { useState } from "react";
 import pacmanIcon from "./icons/pacman.png";
 import ghostIcon from "./icons/ghost.png";
+import { useChannel, usePresence } from "@ably-labs/react-hooks";
 
 export default function Game() {
+  const [state, setState] = useState();
+  const [presenceData, updateStatus] = usePresence("primary", {
+    name: localStorage.getItem("playerName"),
+  });
+
+  const [channel] = useChannel("primary", (message) => {
+    setState(message.data);
+  });
+
   //De
   const width = 70;
   const height = 40;
   const playerSize = 20;
-  const players = [
-    { position: [0, 0], isPacman: false },
-    { position: [2, 2], isPacman: false },
-    { position: [5, 5], isPacman: true },
-  ]; //(0,0)(70,70)
+  const players = state?.players; //(0,0)(70,70)
 
   return (
     <Center>
@@ -34,15 +40,15 @@ export default function Game() {
           position: "relative",
         }}
       >
-        {players.map((player) => (
+        {players?.map((player) => (
           <Image
             src={player.isPacman ? pacmanIcon : ghostIcon}
             sx={{
               width: `${playerSize}px`,
               height: `${playerSize}px`,
               position: "absolute",
-              left: `${player.position[0] * playerSize}px`,
-              top: `${player.position[1] * playerSize}px`,
+              left: `${player.cord[0] * playerSize}px`,
+              top: `${player.cord[1] * playerSize}px`,
             }}
           ></Image>
         ))}

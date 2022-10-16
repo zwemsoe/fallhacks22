@@ -1,14 +1,14 @@
-import {
-  FormControl,
-  FormHelperText,
-  Input,
-  Button,
-  Box,
-} from "@chakra-ui/react";
+import { FormControl, Input, Button, Box } from "@chakra-ui/react";
 import { useState } from "react";
 
 export default function Home() {
-  const [numPlayers, setNumPlayers] = useState(0);
+  const [name, setName] = useState("");
+
+  const enterGame = () => {
+    localStorage.setItem("playerName", name);
+    window.location.href = "/game";
+  };
+
   return (
     <Box
       sx={{
@@ -28,9 +28,13 @@ export default function Home() {
           padding: "20px",
         }}
       >
-        <Input type='text' placeholder='Your name' />
-        <Button>Enter Game</Button>
-        <FormHelperText>Number of players: {numPlayers} / 3</FormHelperText>
+        <Input
+          type='text'
+          placeholder='Your name'
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <Button onClick={enterGame}>Enter Game</Button>
       </FormControl>
     </Box>
   );
