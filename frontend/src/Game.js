@@ -22,10 +22,13 @@ export default function Game() {
     { position: [0, 0], isPacman: false },
     { position: [2, 2], isPacman: false },
     { position: [5, 5], isPacman: true },
-  ]; //(0,0)(70,70)
+  ];
+  const playerIsPacman = false;
+  //(0,0)(70,70)
 
   return (
-    <Center>
+    <Center sx={{display: "flex", flexDirection: "column"}}>
+      <b>You are playing as {`${playerIsPacman ? "Pacman, try to capture the ghosts" : "Ghost, run away from the pacman"}`}</b>
       <Box
         sx={{
           backgroundColor: "red",
